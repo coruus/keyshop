@@ -6,6 +6,7 @@ package ks
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"regexp"
 
 	"github.com/golang/glog"
@@ -19,6 +20,11 @@ func validYmail(email string) bool {
 	// Python. Yipes.
 	r := regexp.MustCompile(`^[a-z][a-z0-9]{2,64}@(yahoo-inc\.com|uk\.yahoo-inc\.com|yahoo-corp\.jp|tumblr\.com|yahoo\.com)$`)
 	return r.MatchString(email)
+}
+
+func verifyAuth(userid string, r *http.Request) (ok bool) {
+	// FIXME(OSS): Authentication-mechanism-specific checks.
+	return
 }
 
 func validKeyForUser(userid, email string, key []byte) (ok bool) {

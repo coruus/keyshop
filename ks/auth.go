@@ -9,11 +9,23 @@ import (
 	"github.com/golang/glog"
 )
 
-type handler func(w http.ResponseWriter, r *http.Request)
+// TODO: split up middleware as appropriate
 
-func requireAuth(f handler, forwrite bool) handler {
+func log(handle http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		glog.Infof("%s %s", r.Method, r.URL)
+		if r.ContentLength <= 0 || r.ContentLength > maxKeyLen {
+			// Bail; we don't want to ReadAll...
+			glog.Warningf("request content length invalid: %d", r.ContentLength)
+			return
+		}
+		handle(w, r)
+	}
+}
+
+func requireAuth(f http.HandlerFunc, forwrite bool) http.HandlerFunc {
 	if Config.SkipAuth {
-		glog.Infof("requireAuth: skipping auth due to configuration")
+		glog.Errorf("requireAuth: skipping auth due to configuration")
 		return func(w http.ResponseWriter, r *http.Request) {
 			glog.Infof("NOAUTH: request %+v", r)
 			f(w, r)

@@ -33,24 +33,21 @@ var (
 	//    {userid}
 	//    body.userid
 	// are identical.
-	Post = requireAuth(post, true)
-	Get  = requireAuth(get, false)
+	Post      = log(requireAuth(post, true))
+	Get       = log(requireAuth(get, false))
+	DeleteAll = log(requireAuth(deleteAll, true))
 )
+
+func deleteAll(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userid := vars["userid"]
+	w.WriteHeader(ks.DeleteAll(userid))
+	return
+}
 
 func post(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userid, deviceid := vars["userid"], vars["deviceid"]
-
-	// The RequireAuth wrapper ensures that the userid
-	// muxed out of the URL is identical to the YBY's
-	// userid.
-	glog.Infof("POST /v1/k/%s/%s", userid, deviceid)
-
-	if r.ContentLength <= 0 || r.ContentLength > maxKeyLen {
-		// Bail; we don't want to ReadAll...
-		glog.Warningf("request content length invalid: %d", r.ContentLength)
-		return
-	}
 
 	// Read the key
 	enc, err := ioutil.ReadAll(r.Body)
@@ -125,8 +122,12 @@ func get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FIXME(OSS): Check that you're willing to accept registrations
-	// for this email address.
+	// FIXME(OSS): Check that you're willing to process keys for this email address.
+	if !verifyAuth(userid, r) {
+		// Note that in this case, no signed statement is made.
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 
 	keys, status := ks.Get(userid)
 	switch status {
@@ -134,7 +135,7 @@ func get(w http.ResponseWriter, r *http.Request) {
 		break
 	case http.StatusNotFound:
 		// We sign a statement that there are no registered keys.
-		// FIXME(OSS): This should be cached up to some max-freshness period.
+		// TODO: This should be cached up to some max-freshness period.
 		keys = make(map[string]string)
 		w.WriteHeader(http.StatusNotFound)
 	default:

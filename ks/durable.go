@@ -25,16 +25,33 @@ type Key struct {
 	Key      []byte
 }
 
+// KeyShop is the interface to the v1 REST API. This API is
+// only intended for prototyping the extension. It will not
+// last long.
+// TODO.v1a: Cleanly separate KeyShop interface -- which should
+// verify keygraphs -- from the durable storage API.
 type KeyShop interface {
+	// New creates a new key for a given (userid, deviceid).
+	// TODO.v1a: Disable entirely.
+	// It fails if the deviceid already exists for that user.
 	New(userid, deviceid, key []byte) int
+	// Update updates an existing key for a given (userid, deviceid).
+	// TODO.v1a: Require signature over previous keyset.
 	Update(userid, deviceid, key []byte) int
+	// Get gets all the keys registered for a given (userid, deviceid).
+	// TODO: Sigcache
 	Get(userid []byte) (map[string][]byte, int)
+	// Deletes *all* the keys registered for a user. Intended mainly
+	// for my own use, because I may soon exceed message-size limits...
+	DeleteAll(userid []byte) int
 }
 
 type state struct {
 	db *bolt.DB
 	KeyShop
 }
+
+// TODO(dlg): Is this storage mechanism absurdly stupid? Probably.
 
 func (s *state) New(userid, deviceid, key []byte) (status int) {
 	err := s.db.Update(func(tx *bolt.Tx) error {
@@ -123,5 +140,18 @@ func (s *state) Get(userid string) (keys map[string]string, status int) {
 	default:
 		glog.Infof("error trying to get keys for %s: %s", userid, err)
 		return nil, http.StatusInternalServerError
+	}
+}
+
+func (s *state) DeleteAll(userid string) (status int) {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.DeleteBucket([]byte(userid))
+	})
+	switch err {
+	case nil:
+		return http.StatusOK
+	default:
+		glog.Infof("error trying to get keys for %s: %s", userid, err)
+		return http.StatusInternalServerError
 	}
 }
